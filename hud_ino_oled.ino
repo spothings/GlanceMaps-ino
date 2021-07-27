@@ -2,6 +2,7 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include "base64.hpp"
 
 #include <SoftwareSerial.h>
 SoftwareSerial BTSerial(10, 11); // RX | TX
@@ -18,7 +19,7 @@ SoftwareSerial BTSerial(10, 11); // RX | TX
 #define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-#define buffLength 200
+#define buffLength 512
 
 #define LOGO_HEIGHT   32
 #define LOGO_WIDTH    32
@@ -51,6 +52,8 @@ void setup() {
   display.clearDisplay();
   display.setTextSize(1);      // Normal 1:1 pixel scale
   display.setTextColor(SSD1306_WHITE); // Draw white text
+
+  BTSerial.println("STARTED");
 }
 
 void loop(){
@@ -68,69 +71,69 @@ void loop(){
     }
 
     buffOffset++;
+    if (buffOffset >= buffLength) {
+      Serial.println("Running out of buffer");
+    }
   }
 }
 
-void processCommand(char *cmd) {
+void resetImgBuff() {
+  for (int i = 0; i<128;i++) {
+    epd_bitmap_Frame_1[i] = 0x00;
+  }
+}
+
+void processCommand(char *_cmd) {
+  String cmd(_cmd);
   Serial.println(cmd);
-  display.clearDisplay();
+
+  if (cmd[0] == 'a') {
+//    lastPx = 0;
+    resetImgBuff();
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.println(cmd.substring(1));
+    display.display();
+  }
   
-  char _copyBuff[buffLength];
-  char _str[buffLength];
-  strcpy(_copyBuff, cmd);
-
-  char delim[] = ";";
-  char *ptr = strtok(_copyBuff, delim);
-
-  int _offset = 0;
-  int _line = 0;
-
-  while (ptr != NULL)
-  {
-    strcpy(_str, ptr);
-    
-    if (_offset == 0) {
-      // Baris pertama
-      display.setCursor(0, 0);     // Start at top-left corner
-      display.println(_str);
-    } else if (_offset == 1) {
-      // Baris kedua
-      display.setCursor(0, 16);     // Start at top-left corner
-      display.println(_str);
-    } else {
-      // Gambar
-      Serial.println(strlen(_str));
-
-      for (int i=0;i<128;i++) {
-        epd_bitmap_Frame_1[i] = 0b00000000;
-      }
-
-      int lastFilled = 0;
-      byte x = 0b00000000;
-      for (int i = 0; i<strlen(_str); i++) {
-        if (_str[i] == '0') {
-          bitWrite(x, 7 - (i % 8), 0);
-        } else {
-          bitWrite(x, 7 - (i % 8), 1);
-        }
-
-        if (i != 0 && i % 8 == 0) {
-          epd_bitmap_Frame_1[lastFilled] = x;
-          x = 0b00000000;
-          lastFilled++;
-        }
-      }
-
-      display.drawBitmap(
-        (SCREEN_WIDTH  - LOGO_WIDTH ),
-        0,
-        epd_bitmap_Frame_1, LOGO_WIDTH, LOGO_HEIGHT, 1);
-    }
-
-    ptr = strtok(NULL, delim);
-    _offset++;
-    _line++;
+  if (cmd[0] == 'b') {
+    display.setCursor(0, 17);
+    display.println(cmd.substring(1));
+    display.display();
   }
 
-  display.display();
+  //  Baris 1 :: c1
+  if (cmd[0] == 'c') {
+    Serial.println(cmd);
+
+    int _fromIn = cmd.indexOf(',') - 1;
+    String _offStr = cmd.substring(1, _fromIn + 1);
+    Serial.println("mmm " + _offStr);
+    int _from = _offStr.toInt();
+    
+    int _untilIn = cmd.indexOf(':') - 1;
+    String _untilStr = cmd.substring(_fromIn + 2, _untilIn + 1);
+    Serial.println("mmm2 " + _untilStr);
+    int _until = _untilStr.toInt();
+
+    int _lastOne = _until + 1;
+    int _toFill = _from;
+    String _b = "";
+    for (int i = _untilIn + 1; i<cmd.length(); i++) {
+      if (cmd[i] == ' ') {
+        Serial.println("lll:" + _b);
+//        _lastOne = i + 1;
+        epd_bitmap_Frame_1[_toFill] = _b.toInt();
+        _b = "";
+        _toFill++;
+      } else {
+        _b += cmd[i];
+      }
+    }
+
+    Serial.println("c" + _offStr + "," + _untilStr + ":");
+    BTSerial.println("c" + _offStr + "," + _untilStr + ":");
+    
+    display.display();
+  }
 }
