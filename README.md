@@ -1,4 +1,4 @@
-# GlanceMaps-ino
+# GlanceMaps
 GlanceMaps merupakan set perangkat keras yang ditanamkan di helm untuk digunakan sebagai alat bantu navigasi yang dalam kerjanya ditemani dengan sebuah perangkat lunak berupa aplikasi mobile yang akan membaca instruksi navigasi dari Google Maps dan akan mengirimkannya ke layar secara visual.
 
 ## Source
